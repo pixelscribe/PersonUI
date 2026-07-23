@@ -1,0 +1,152 @@
+@page "/"
+@rendermode InteractiveServer
+@inject PersonApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>People</PageTitle>
+
+<div class="page-header">
+    <h1>People</h1>
+    <a class="btn btn-primary" href="/people/create">+ Add Person</a>
+</div>
+
+<div class="search-bar">
+    <input type="search"
+           placeholder="Search by first or last name…"
+           value="@searchTerm"
+           @oninput="OnSearchInput"
+           @onkeyup="OnSearchKeyUp" />
+    @if (!string.IsNullOrWhiteSpace(searchTerm))
+    {
+        <button class="btn btn-secondary" @onclick="ClearSearch">Clear</button>
+    }
+</div>
+
+@if (errorMessage is not null)
+{
+    <div class="alert alert-error">@errorMessage</div>
+}
+
+@if (loading)
+{
+    <p class="muted">Loading…</p>
+}
+else if (people is { Count: 0 })
+{
+    <p class="muted">No people found.</p>
+}
+else if (people is not null)
+{
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>First name</th>
+                <th>Last name</th>
+                <th>Email</th>
+                <th>Created</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var person in people)
+            {
+                <tr>
+                    <td>@person.FirstName</td>
+                    <td>@person.LastName</td>
+                    <td>@person.Email</td>
+                    <td>@person.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                    <td class="row-actions">
+                        <a class="btn btn-small" href="@($"/people/edit/{person.Id}")">Edit</a>
+                        <button class="btn btn-small btn-danger" @onclick="() => DeleteAsync(person)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Person>? people;
+    private string searchTerm = string.Empty;
+    private string? errorMessage;
+    private bool loading = true;
+    private CancellationTokenSource? debounceCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            people = string.IsNullOrWhiteSpace(searchTerm)
+                ? await Api.GetAllAsync()
+                : await Api.SearchAsync(searchTerm);
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Couldn't reach PersonApi: {ex.Message}";
+            people = [];
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        searchTerm = e.Value?.ToString() ?? string.Empty;
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        // Debounce so we don't hit the API on every keystroke.
+        debounceCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        debounceCts = cts;
+
+        try
+        {
+            await Task.Delay(300, cts.Token);
+            await LoadAsync();
+        }
+        catch (TaskCanceledException)
+        {
+            // Superseded by a newer keystroke — ignore.
+        }
+    }
+
+    private async Task ClearSearch()
+    {
+        searchTerm = string.Empty;
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(Person person)
+    {
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm", $"Delete {person.FirstName} {person.LastName}?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var result = await Api.DeleteAsync(person.Id);
+        if (result.Success)
+        {
+            await LoadAsync();
+        }
+        else
+        {
+            errorMessage = result.Error;
+        }
+    }
+}

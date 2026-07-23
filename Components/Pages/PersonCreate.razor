@@ -1,0 +1,67 @@
+@page "/people/create"
+@rendermode InteractiveServer
+@inject PersonApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Add Person</PageTitle>
+
+<div class="page-header">
+    <h1>Add Person</h1>
+</div>
+
+<EditForm Model="model" OnValidSubmit="HandleSubmit" class="person-form">
+    <DataAnnotationsValidator />
+
+    @if (serverError is not null)
+    {
+        <div class="alert alert-error">@serverError</div>
+    }
+
+    <label>
+        First name
+        <InputText @bind-Value="model.FirstName" />
+        <ValidationMessage For="() => model.FirstName" />
+    </label>
+
+    <label>
+        Last name
+        <InputText @bind-Value="model.LastName" />
+        <ValidationMessage For="() => model.LastName" />
+    </label>
+
+    <label>
+        Email
+        <InputText @bind-Value="model.Email" type="email" />
+        <ValidationMessage For="() => model.Email" />
+    </label>
+
+    <div class="form-actions">
+        <button class="btn btn-primary" type="submit" disabled="@saving">
+            @(saving ? "Saving…" : "Create")
+        </button>
+        <a class="btn btn-secondary" href="/">Cancel</a>
+    </div>
+</EditForm>
+
+@code {
+    private readonly PersonFormModel model = new();
+    private string? serverError;
+    private bool saving;
+
+    private async Task HandleSubmit()
+    {
+        saving = true;
+        serverError = null;
+
+        var result = await Api.CreateAsync(model);
+        if (result.Success)
+        {
+            Nav.NavigateTo("/");
+        }
+        else
+        {
+            serverError = result.Error;
+            saving = false;
+        }
+    }
+}

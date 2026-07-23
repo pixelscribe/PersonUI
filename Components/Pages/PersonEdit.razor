@@ -1,0 +1,104 @@
+@page "/people/edit/{Id:long}"
+@rendermode InteractiveServer
+@inject PersonApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Edit Person</PageTitle>
+
+<div class="page-header">
+    <h1>Edit Person</h1>
+</div>
+
+@if (loading)
+{
+    <p class="muted">Loading…</p>
+}
+else if (notFound)
+{
+    <div class="alert alert-error">No person with id @Id was found.</div>
+    <a class="btn btn-secondary" href="/">Back to list</a>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="HandleSubmit" class="person-form">
+        <DataAnnotationsValidator />
+
+        @if (serverError is not null)
+        {
+            <div class="alert alert-error">@serverError</div>
+        }
+
+        <label>
+            First name
+            <InputText @bind-Value="model!.FirstName" />
+            <ValidationMessage For="() => model!.FirstName" />
+        </label>
+
+        <label>
+            Last name
+            <InputText @bind-Value="model!.LastName" />
+            <ValidationMessage For="() => model!.LastName" />
+        </label>
+
+        <label>
+            Email
+            <InputText @bind-Value="model!.Email" type="email" />
+            <ValidationMessage For="() => model!.Email" />
+        </label>
+
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit" disabled="@saving">
+                @(saving ? "Saving…" : "Save")
+            </button>
+            <a class="btn btn-secondary" href="/">Cancel</a>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public long Id { get; set; }
+
+    private PersonFormModel? model;
+    private string? serverError;
+    private bool loading = true;
+    private bool notFound;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var person = await Api.GetByIdAsync((ulong)Id);
+        if (person is null)
+        {
+            notFound = true;
+        }
+        else
+        {
+            model = new PersonFormModel
+            {
+                FirstName = person.FirstName,
+                LastName = person.LastName,
+                Email = person.Email,
+            };
+        }
+
+        loading = false;
+    }
+
+    private async Task HandleSubmit()
+    {
+        saving = true;
+        serverError = null;
+
+        var result = await Api.UpdateAsync((ulong)Id, model!);
+        if (result.Success)
+        {
+            Nav.NavigateTo("/");
+        }
+        else
+        {
+            serverError = result.Error;
+            saving = false;
+        }
+    }
+}
