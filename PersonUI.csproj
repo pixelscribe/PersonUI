@@ -7,4 +7,11 @@
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="PersonUI.Tests/**" />
+    <Content Remove="PersonUI.Tests/**" />
+    <EmbeddedResource Remove="PersonUI.Tests/**" />
+    <None Remove="PersonUI.Tests/**" />
+  </ItemGroup>
+
 </Project>

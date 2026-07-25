@@ -69,32 +69,38 @@ public class PersonApiClient(HttpClient http)
             using var doc = JsonDocument.Parse(body);
             var root = doc.RootElement;
 
-            if (root.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Object)
+            // A quoted plain-text message (e.g. the 409 conflict body) is valid JSON too -
+            // just a JSON string, not an object - so guard on ValueKind rather than letting
+            // TryGetProperty throw InvalidOperationException on a non-object root.
+            if (root.ValueKind == JsonValueKind.Object)
             {
-                var messages = errors.EnumerateObject()
-                    .SelectMany(p => p.Value.EnumerateArray())
-                    .Select(v => v.GetString())
-                    .Where(m => !string.IsNullOrWhiteSpace(m));
-
-                var joined = string.Join(" ", messages);
-                if (!string.IsNullOrWhiteSpace(joined))
+                if (root.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Object)
                 {
-                    return joined;
+                    var messages = errors.EnumerateObject()
+                        .SelectMany(p => p.Value.EnumerateArray())
+                        .Select(v => v.GetString())
+                        .Where(m => !string.IsNullOrWhiteSpace(m));
+
+                    var joined = string.Join(" ", messages);
+                    if (!string.IsNullOrWhiteSpace(joined))
+                    {
+                        return joined;
+                    }
                 }
-            }
 
-            if (root.TryGetProperty("title", out var title))
-            {
-                var text = title.GetString();
-                if (!string.IsNullOrWhiteSpace(text))
+                if (root.TryGetProperty("title", out var title))
                 {
-                    return text;
+                    var text = title.GetString();
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        return text;
+                    }
                 }
             }
         }
         catch (JsonException)
         {
-            // Not JSON (e.g. the plain-text 409 conflict message) — fall through and return the raw body.
+            // Not JSON at all - fall through and return the raw body.
         }
 
         return body.Trim('"');
