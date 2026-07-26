@@ -124,4 +124,20 @@ public abstract class PersonTestBase : IAsyncLifetime
         await row.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Delete" }).ClickAsync();
         await ExpectHiddenAsync(row);
     }
+
+    // Swallows exceptions so that cleaning up one person can't prevent cleaning
+    // up another in the same finally block, and so a cleanup failure doesn't
+    // mask the original test failure. Always use this (never DeletePersonAsync
+    // directly) from a finally block.
+    protected async Task TryDeletePersonAsync(string lastName)
+    {
+        try
+        {
+            await DeletePersonAsync(lastName);
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"Cleanup failed for '{lastName}' (may need manual removal): {ex.Message}");
+        }
+    }
 }

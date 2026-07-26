@@ -21,7 +21,7 @@ public class PersonConflictTests(PlaywrightFixture fixture) : PersonTestBase(fix
         }
         finally
         {
-            await DeletePersonAsync(lastName);
+            await TryDeletePersonAsync(lastName);
         }
     }
 }
