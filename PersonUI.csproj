@@ -12,6 +12,11 @@
     <Content Remove="PersonUI.Tests/**" />
     <EmbeddedResource Remove="PersonUI.Tests/**" />
     <None Remove="PersonUI.Tests/**" />
+
+    <Compile Remove="PersonUI.E2E.Tests/**" />
+    <Content Remove="PersonUI.E2E.Tests/**" />
+    <EmbeddedResource Remove="PersonUI.E2E.Tests/**" />
+    <None Remove="PersonUI.E2E.Tests/**" />
   </ItemGroup>
 
 </Project>
