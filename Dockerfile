@@ -7,7 +7,7 @@ COPY PersonUI.csproj ./
 RUN dotnet restore PersonUI.csproj
 
 COPY . .
-RUN dotnet publish PersonUI.csproj -c Release -o /app --no-restore
+RUN dotnet publish PersonUI.csproj -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
