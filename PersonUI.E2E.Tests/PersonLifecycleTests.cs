@@ -17,15 +17,24 @@ public class PersonLifecycleTests(PlaywrightFixture fixture) : PersonTestBase(fi
         var updatedLastName = $"E2E-{unique}-updated";
         var email = $"e2e-{unique}@example.com";
 
-        var row = await CreatePersonAsync("Playwright", lastName, email);
+        try
+        {
+            var row = await CreatePersonAsync("Playwright", lastName, email);
 
-        await EditLastNameAsync(row, updatedLastName);
+            await EditLastNameAsync(row, updatedLastName);
 
-        var updatedRow = RowByText(updatedLastName);
-        await ExpectVisibleAsync(updatedRow);
+            var updatedRow = RowByText(updatedLastName);
+            await ExpectVisibleAsync(updatedRow);
 
-        await updatedRow.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Delete" }).ClickAsync();
-        await ExpectHiddenAsync(updatedRow);
+            await updatedRow.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Delete" }).ClickAsync();
+            await ExpectHiddenAsync(updatedRow);
+        }
+        finally
+        {
+            // Whichever name the person currently has if something failed partway.
+            await TryDeletePersonAsync(updatedLastName);
+            await TryDeletePersonAsync(lastName);
+        }
     }
 
     private async Task EditLastNameAsync(ILocator row, string newLastName)
