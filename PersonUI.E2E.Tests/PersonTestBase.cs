@@ -88,6 +88,11 @@ public abstract class PersonTestBase : IAsyncLifetime
     // in time just means the next attempt's click() throws (element already
     // gone/changed) or is a harmless no-op, and the expectation check below
     // catches success either way.
+    //
+    // Catches Exception, not PlaywrightException: a click that can't find/act
+    // on its target within its own action timeout throws System.TimeoutException,
+    // not PlaywrightException (only Assertions.Expect timeouts do) - missing
+    // this meant retries silently never engaged for that failure mode.
     protected async Task ClickUntilAsync(Func<Task> click, Func<Task> checkExpectation, int maxAttempts = 4)
     {
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
@@ -96,7 +101,7 @@ public abstract class PersonTestBase : IAsyncLifetime
             {
                 await click();
             }
-            catch (PlaywrightException) when (attempt < maxAttempts)
+            catch (Exception) when (attempt < maxAttempts)
             {
             }
 
@@ -105,7 +110,7 @@ public abstract class PersonTestBase : IAsyncLifetime
                 await checkExpectation();
                 return;
             }
-            catch (PlaywrightException) when (attempt < maxAttempts)
+            catch (Exception) when (attempt < maxAttempts)
             {
             }
         }
@@ -159,7 +164,8 @@ public abstract class PersonTestBase : IAsyncLifetime
 
     protected Task SubmitCreateFormUntilAsync(ILocator expectation) =>
         ClickUntilVisibleAsync(
-            () => Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Create" }).ClickAsync(),
+            () => Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Create" })
+                .ClickAsync(new LocatorClickOptions { Timeout = 8000 }),
             expectation);
 
     // Full create flow, asserting the person actually appears on the home page.
@@ -189,7 +195,8 @@ public abstract class PersonTestBase : IAsyncLifetime
         }
 
         await ClickUntilHiddenAsync(
-            () => row.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Delete" }).ClickAsync(),
+            () => row.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Delete" })
+                .ClickAsync(new LocatorClickOptions { Timeout = 8000 }),
             row);
     }
 
