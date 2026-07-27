@@ -26,8 +26,9 @@ public class PersonLifecycleTests(PlaywrightFixture fixture) : PersonTestBase(fi
             var updatedRow = RowByText(updatedLastName);
             await ExpectVisibleAsync(updatedRow);
 
-            await updatedRow.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Delete" }).ClickAsync();
-            await ExpectHiddenAsync(updatedRow);
+            await ClickUntilHiddenAsync(
+                () => updatedRow.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Delete" }).ClickAsync(),
+                updatedRow);
         }
         finally
         {
@@ -44,8 +45,9 @@ public class PersonLifecycleTests(PlaywrightFixture fixture) : PersonTestBase(fi
 
         var inputs = Page.Locator("form input:not([type='hidden'])");
         await inputs.Nth(1).FillAsync(newLastName);
-        await Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Save" }).ClickAsync();
 
-        await ExpectVisibleAsync(RowByText(newLastName));
+        await ClickUntilVisibleAsync(
+            () => Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Save" }).ClickAsync(),
+            RowByText(newLastName));
     }
 }

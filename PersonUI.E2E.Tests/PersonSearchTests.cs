@@ -18,14 +18,9 @@ public class PersonSearchTests(PlaywrightFixture fixture) : PersonTestBase(fixtu
             await CreatePersonAsync("Playwright", otherLastName, $"other-{Guid.NewGuid():N}@example.com");
 
             await GoHomeAsync();
-            // PressSequentially fires real key events, needed for the search
-            // box's @onkeyup-driven (debounced) filtering - Fill only fires
-            // input/change, which the search box also handles but this is
-            // closer to how a real user triggers it.
-            await Page.Locator("input[type='search']").PressSequentiallyAsync(matchLastName);
+            await SearchUntilHiddenAsync(Page.Locator("input[type='search']"), matchLastName, RowByText(otherLastName));
 
             await ExpectVisibleAsync(RowByText(matchLastName));
-            await ExpectHiddenAsync(RowByText(otherLastName));
         }
         finally
         {

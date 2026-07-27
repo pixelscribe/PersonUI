@@ -1,5 +1,3 @@
-using Microsoft.Playwright;
-
 namespace PersonUI.E2E.Tests;
 
 // Validation is already covered in-process by PersonUI.Tests, but this
@@ -13,9 +11,8 @@ public class PersonValidationTests(PlaywrightFixture fixture) : PersonTestBase(f
         await Page.GotoAsync($"{BaseUrl}/people/create");
         await WaitForInteractiveAsync();
 
-        await Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Create" }).ClickAsync();
+        await SubmitCreateFormUntilAsync(Page.GetByText("First name is required."));
 
-        await ExpectVisibleAsync(Page.GetByText("First name is required."));
         await ExpectVisibleAsync(Page.GetByText("Last name is required."));
         await ExpectVisibleAsync(Page.GetByText("Email is required."));
     }
