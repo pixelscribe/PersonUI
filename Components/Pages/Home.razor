@@ -14,8 +14,8 @@
 <div class="search-bar">
     <input type="search"
            placeholder="Search by first or last name…"
-           value="@searchTerm"
-           @oninput="OnSearchInput"
+           @bind-value="searchTerm"
+           @bind-value:event="oninput"
            @onkeyup="OnSearchKeyUp" />
     @if (!string.IsNullOrWhiteSpace(searchTerm))
     {
@@ -99,11 +99,6 @@ else if (people is not null)
         {
             loading = false;
         }
-    }
-
-    private void OnSearchInput(ChangeEventArgs e)
-    {
-        searchTerm = e.Value?.ToString() ?? string.Empty;
     }
 
     private async Task OnSearchKeyUp(KeyboardEventArgs e)
