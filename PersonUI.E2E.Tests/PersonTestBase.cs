@@ -79,10 +79,74 @@ public abstract class PersonTestBase : IAsyncLifetime
     protected async Task ExpectHiddenAsync(ILocator locator) =>
         await Assertions.Expect(locator).Not.ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = AssertionTimeout.Ms });
 
-    // Navigates to the create page, fills the form and submits, but does not
-    // wait for or assert the outcome - callers check whatever they care about
-    // (a new row, a validation message, a conflict error).
-    protected async Task GoToCreateAndSubmitAsync(string firstName, string lastName, string email)
+    // Even after WaitForInteractiveAsync's check + settle buffer, the circuit
+    // has occasionally not been fully attached to a specific element's event
+    // handler yet when running on GitHub's runners (not reproducible locally -
+    // environment-speed dependent). Retrying the click itself is robust to
+    // this regardless of how slow a given run is, unlike guessing a fixed
+    // delay. Safe to retry: a click that actually landed but wasn't detected
+    // in time just means the next attempt's click() throws (element already
+    // gone/changed) or is a harmless no-op, and the expectation check below
+    // catches success either way.
+    protected async Task ClickUntilAsync(Func<Task> click, Func<Task> checkExpectation, int maxAttempts = 4)
+    {
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                await click();
+            }
+            catch (PlaywrightException) when (attempt < maxAttempts)
+            {
+            }
+
+            try
+            {
+                await checkExpectation();
+                return;
+            }
+            catch (PlaywrightException) when (attempt < maxAttempts)
+            {
+            }
+        }
+    }
+
+    protected Task ClickUntilVisibleAsync(Func<Task> click, ILocator expectation) =>
+        ClickUntilAsync(click, () => Assertions.Expect(expectation).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 3000 }));
+
+    protected Task ClickUntilHiddenAsync(Func<Task> click, ILocator expectation) =>
+        ClickUntilAsync(click, () => Assertions.Expect(expectation).Not.ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 3000 }));
+
+    // Same rationale as ClickUntilAsync, but for the search box, whose
+    // @oninput/@onkeyup handler might not be wired yet - retries rather than
+    // assuming one attempt landed. Uses Fill (atomic, one input event) plus a
+    // single manually-dispatched keyup rather than typing character-by-
+    // character: the search box is one-way bound (value="@searchTerm" with
+    // manual handlers, not @bind-Value), so a server re-render after the
+    // debounced search completes forcibly resets the DOM value to match
+    // server state - if that lands mid-keystroke, it corrupts whatever's
+    // been typed so far. Setting the value in one shot avoids that window.
+    protected async Task SearchUntilHiddenAsync(ILocator searchBox, string searchText, ILocator expectation, int maxAttempts = 4)
+    {
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            await searchBox.FillAsync(searchText);
+            await searchBox.DispatchEventAsync("keyup");
+            try
+            {
+                await Assertions.Expect(expectation).Not.ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 3000 });
+                return;
+            }
+            catch (PlaywrightException) when (attempt < maxAttempts)
+            {
+            }
+        }
+    }
+
+    // Navigates to the create page and fills the form, but does not submit -
+    // callers submit via SubmitCreateFormUntilAsync with whatever expectation
+    // fits (a new row, a validation message, a conflict error).
+    protected async Task FillCreateFormAsync(string firstName, string lastName, string email)
     {
         await Page.GotoAsync($"{BaseUrl}/people/create");
         await WaitForInteractiveAsync();
@@ -91,17 +155,20 @@ public abstract class PersonTestBase : IAsyncLifetime
         await inputs.Nth(0).FillAsync(firstName);
         await inputs.Nth(1).FillAsync(lastName);
         await inputs.Nth(2).FillAsync(email);
-
-        await Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Create" }).ClickAsync();
     }
+
+    protected Task SubmitCreateFormUntilAsync(ILocator expectation) =>
+        ClickUntilVisibleAsync(
+            () => Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Create" }).ClickAsync(),
+            expectation);
 
     // Full create flow, asserting the person actually appears on the home page.
     protected async Task<ILocator> CreatePersonAsync(string firstName, string lastName, string email)
     {
-        await GoToCreateAndSubmitAsync(firstName, lastName, email);
+        await FillCreateFormAsync(firstName, lastName, email);
 
         var row = RowByText(lastName);
-        await ExpectVisibleAsync(row);
+        await SubmitCreateFormUntilAsync(row);
         return row;
     }
 
@@ -121,8 +188,9 @@ public abstract class PersonTestBase : IAsyncLifetime
             return;
         }
 
-        await row.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Delete" }).ClickAsync();
-        await ExpectHiddenAsync(row);
+        await ClickUntilHiddenAsync(
+            () => row.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Delete" }).ClickAsync(),
+            row);
     }
 
     // Swallows exceptions so that cleaning up one person can't prevent cleaning

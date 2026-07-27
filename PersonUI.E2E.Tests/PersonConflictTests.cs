@@ -15,9 +15,8 @@ public class PersonConflictTests(PlaywrightFixture fixture) : PersonTestBase(fix
         {
             await CreatePersonAsync("Playwright", lastName, email);
 
-            await GoToCreateAndSubmitAsync("Playwright", $"Dupe2-{unique}", email);
-
-            await ExpectVisibleAsync(Page.GetByText($"A person with email '{email}' already exists."));
+            await FillCreateFormAsync("Playwright", $"Dupe2-{unique}", email);
+            await SubmitCreateFormUntilAsync(Page.GetByText($"A person with email '{email}' already exists."));
         }
         finally
         {
